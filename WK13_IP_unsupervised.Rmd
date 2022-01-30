@@ -1,0 +1,289 @@
+---
+title: "IP_week13"
+author: "Stephen Njuguna"
+date: "1/30/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Customer Groups
+
+## Defining the question 
+Learn the customer’s behavior and characteristics  and group them. 
+
+## Defining the metric for success
+Being able to sucessfully cluster the customers 
+
+## Understanding the context
+Understanding consumer behavior is a vital aspect of marketing. Consumer behavior is the study of how people make decisions about what they buy, want, need, or act in regards to a product, service, or company. It also helps companies identify opportunities that are not currently met.
+
+## Experimental design
+ * Problem Definition
+ * Data Sourcing
+ * Check the Data
+ * Perform Data Cleaning
+ * Perform Exploratory Data Analysis  (Univariate, Bivariate & Multivariate)
+ * Implement the Solution
+ * Challenge the Solution
+
+
+## Read Our Dataset
+
+```{r}
+#Reading the Dataset and preveiwing dataset  
+
+customer <- read.csv('http://bit.ly/EcommerceCustomersDataset')
+
+head(customer)
+```
+```{r}
+#Checking the data types 
+str(customer)
+```
+
+```{r}
+#Checking data dimension 
+dim(customer)
+```
+## Data Cleaning 
+
+```{r}
+#Checking for missing values 
+colSums(is.na(customer))
+```
+
+```{r}
+#Dealing with the missing values  
+customer <- na.omit(customer)
+
+#Dropping all the missing value because they are a very few caparisoning to
+# the number of rows we have 
+```
+
+```{r}
+#Checking for duplicates and dealing with duplicates if any 
+
+customer <- unique(customer)
+```
+
+```{r}
+#Checking for outliers 
+#slecting only numeric columns 
+library(dplyr)
+numeric <- select_if(customer, is.numeric)
+
+#ploting box plots 
+invisible(lapply(1:ncol(numeric), function(i) boxplot(numeric[, i])))
+
+```
+
+## Exploratory Data Analysis
+
+### Univeriate Analysis
+
+```{r}
+#Check statistical summary of data 
+summary(numeric)
+```
+
+
+```{r}
+#Plotting Visitor ype
+v_type <- table(customer$VisitorType)
+barplot(v_type)
+```
+
+Most of the customer are the returning_visitors.
+
+```{r}
+#Plotting month
+month <- table(customer$Month)
+barplot(month)
+```
+
+Most customers visit the e-commerce site on the month of May followed by November.
+The month with the least visits in February 
+
+
+```{r}
+#Plotting the customers Bounce rate 
+hist(numeric$BounceRates)
+```
+Most of the the visiting clients exit  without triggering any other requests 
+to the analytics server.
+
+```{r}
+#Plotting the page value 
+hist(numeric$PageValues)
+```
+
+Most customers visit 0-10 pages before completing e-commerce transaction.
+
+
+```{r}
+#Plotting the special day column 
+hist(numeric$SpecialDay)
+```
+
+Most people visit before or after the special day.
+
+## Biavariate Analysis
+
+```{r}
+#Plotting a correlation plot 
+corr<-cor(numeric)
+corrplot::corrplot(corr, method="number")
+
+```
+
+
+
+```{r}
+#Plotting a scatter plot between bounce and exit rate 
+bounce <- numeric$BounceRates
+exit <- numeric$ExitRates
+plot(bounce, exit, xlab="bounce", ylab="Exit")
+
+```
+
+
+There is strong correlation between bounce and exit rate
+
+```{r}
+#Plotting scatter plot between page value and special day
+value <- numeric$PageValues
+day<- numeric$SpecialDay
+plot(value, day, xlab="Page value", ylab="Special Day")
+
+
+```
+
+There is a strong correctional between page value and special day.
+
+
+## Multivariate Analysis
+
+```{r}
+#Label econding categorical columns to numeric 
+customer$VisitorType <- as.numeric(factor(customer$VisitorType))
+customer$Weekend <- as.numeric(factor(customer$Weekend))
+customer$Region <- as.numeric(factor(customer$Region))
+customer$Revenue <- as.numeric(factor(customer$Revenue))
+customer$Month <- as.numeric(factor(customer$Month))
+
+```
+
+
+```{r}
+custm <- customer[c(-18)]
+#Performing dimension reduction using PCA
+dim_customer <- prcomp(custm,scale. = FALSE)
+
+summary(dim_customer)
+```
+
+
+## Modeling 
+
+### Heirarchical clustering 
+
+```{r}
+#Scale the dataset 
+scaled.custm <- scale(custm)
+```
+
+```{r}
+## Calculate the (Euclidean) distances
+hist.custm <- dist(scaled.custm)
+```
+
+```{r}
+## Create a hierarchical clustering model
+clust.custm <- hclust(hist.custm, method = 'complete')
+```
+
+```{r}
+#Plot (Dendrogram) the clusters to get height 
+plot(clust.custm)
+```
+```{r}
+## Cut tree so that it has 2 clusters:
+custm.clusters <- cutree(clust.custm, k = 2)
+```
+
+```{r}
+# Compare heirarchical cluster to actual clusters
+table(custm.clusters)
+table(customer$Revenue)
+```
+
+Hierarchical cluster ,groups 1's as 12196 compared to the actual of 10291 and group 2's 
+as 3 compared to the actual group of 1908
+
+
+### k-means clustering
+
+```{r}
+#Normalization of the data
+normal <- function(x) (
+  return( ((x - min(x)) /(max(x)-min(x))) )
+)
+normal(1:18)
+nom.custm<- as.data.frame(lapply(customer[,-18], normal))
+```
+
+
+```{r}
+# Create a k-means model on 
+custm.km <- kmeans(nom.custm, centers = 2, nstart = 20)
+```
+
+
+```{r}
+#Plotting the clusters 
+plot(custm[c(2,9)], col = custm.km$cluster)
+```
+```{r}
+# Compare k Mean cluster to actual clusters
+table(custm.km$cluster)
+table(customer$Revenue)
+```
+
+
+K Mean cluster ,groups 1's as 2856 compared to the actual of 10291 and group 2's 
+as 9343 compared to the actual group of 1908
+
+
+
+### Comparisons between K-Means clustering vs Hierarchical
+
+```{r}
+# Compare hierarchical clustering to k-means
+table(custm.clusters)
+table(custm.km$cluster)
+```
+
+
+## Conclusion 
+
+K mean clustering performance much better compared to Hierarchical clustering.
+
+  * K mean cluster works better than hierarchical clustering when it come to large 
+datasets , which in our case we had a large dataset.
+  * K Means clustering needed advance knowledge of  no. of clusters one 
+  want to divide your data compared to hierarchical cluster which finds
+  appropriate by interpreting the dendrogram. In our case we have knowledge of 
+  the number of clusters.
+  * K mean clustering is very sensitive to outliers because when you have 
+  outliers, this can affect the average calculation of the whole cluster.
+  
+
+
+
+
+
+
+

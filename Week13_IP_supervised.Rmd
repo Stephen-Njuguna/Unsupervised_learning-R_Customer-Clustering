@@ -1,0 +1,353 @@
+---
+title: "R_week12_IP"
+author: "Stephen Njuguna"
+date: "1/22/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Cyrptography Course
+
+## Defining the question 
+Identify which individuals are most likely to click on cyrptography course ads. 
+
+## Defining the metric for success
+Being able to identify the individuals that are likely to click on the adds
+
+## Understanding the context
+With targeted advertising, you target your ad campaigns at an specific audience, based on (for example) demographics, location, interests or behaviors. Based on these traits, you'll be able to create more personalized ads that resonate with your target audiences and lead to higher conversion rates
+
+## Experimental design
+ * Data Cleaning and Preparation
+ * Deal with missing values
+ * Deal with duplicated records
+  * Univariate Analysis
+  * Bivariate Analysis
+  * Modeling 
+  * Conclusion
+  * Recommendation
+
+## Read Our Dataset
+  
+```{r}
+#Loading the Dataset
+ad_dataset <- read.csv('http://bit.ly/IPAdvertisingData')
+
+#Previewing the Datset 
+head(ad_dataset)
+
+```
+```{r}
+#Checking for data types
+str(ad_dataset)
+```
+
+
+```{r}
+# Checking the dimensions of our dataset
+dim(ad_dataset)
+```
+## Data Cleaning 
+```{r}
+# Checking for null values
+colSums(is.na(ad_dataset))
+```
+
+
+```{r}
+# Checking for duplicates
+duplicated_rows <- ad_dataset[duplicated(ad_dataset),]
+
+duplicated_rows
+
+```
+
+
+```{r}
+#Checking for outliers 
+#select all numeric columns 
+numeric_df <- ad_dataset[c(1,2,3,4,7,10)]
+invisible(lapply(1:ncol(numeric_df), function(i) boxplot(numeric_df[, i])))
+
+
+
+```
+
+
+We have outliers in  the area income variable but upon further 
+investigations its because some people earn very low income 
+
+## Exploratory Data Analysis
+
+### Univeriate Analysis
+
+```{r}
+#Checking the statistical summary.
+summary(numeric_df)
+
+```
+
+
+```{r}
+#Viewing the ratio of click on ad 
+a <- table(numeric_df$Clicked.on.Ad)
+piepercent<- round(100 * a / sum(a), 1)
+pie(a, labels = piepercent,
+    main = "Click on ad pie chart", col = rainbow(length(a)))
+```
+
+
+We have equal mumber of people who clicked on ads
+
+```{r}
+#To view gender distribution
+gender <- table(numeric_df$Male)
+barplot(gender)
+```
+
+
+Females are more than males
+
+```{r}
+# Previewing the customer age distribution 
+Age <- table(ad_dataset$Age)
+hist(Age)
+```
+
+
+Most of the people who click on ads are between the ages of 20 and 40
+
+## BIVARIATE ANALYSIS
+
+```{r}
+#Plotting a heat map to show correlation between the different variables
+
+corr<-cor(numeric_df)
+corrplot::corrplot(corr, method="number")
+
+```
+
+
+Some observation:
+ * Daily time spend on site has a positive strong correlation with internet 
+    usage.
+ * Click on ads as a strong negative correlation with time spent on 
+   site.
+
+
+```{r}
+# Creating the scatter plot using age and time spend on site
+age <- numeric_df$Age
+time_spent <- numeric_df$Daily.Time.Spent.on.Site
+plot(age, time_spent, xlab="Age", ylab="Time spent onn site")
+```
+
+
+Age and time spent on site have a strong correlation 
+
+```{r}
+#Creating the scatter plot using age and Area income
+income <- numeric_df$Area.Income
+plot(age, income, xlab="Age", ylab="Area Income")
+
+```
+
+
+Area income has a strong correlation to age
+
+## MODELING
+
+### Feature Engineering 
+```{r}
+#only going to focus on numeric columns as the categorical dataset have no patterns.
+head(numeric_df)
+```
+
+### Linear Regression 
+
+```{r}
+#Import Linear model 
+
+lm_model <- lm(Clicked.on.Ad ~ ., data = numeric_df)
+
+summary(lm_model)
+```
+The model seems to be fitting very well to the data because we have a very low Residual
+standard error of 0.21 and also we have an multiple R-squared of 0.82 and Adjusted R-squared
+of 0.82.
+
+### KNN
+
+```{r}
+#Normalize the dataset 
+
+
+normal <- function(x) (
+  return( ((x - min(x)) /(max(x)-min(x))) )
+)
+normal(1:7)
+knn_data<- as.data.frame(lapply(numeric_df[,-6], normal))
+
+```
+
+
+```{r}
+#Feature selection split independent and dependent variables
+feature <- knn_data[-6]
+target <- numeric_df[6]
+```
+
+
+```{r}
+# Required to reproduce the results
+set.seed(999) 
+rnum<- sample(rep(1:1000))
+
+# Randomizing feature dataset
+feature<- feature[rnum,] 
+
+# Applying same randomization of target
+target<- as.data.frame(target[rnum,]) 
+
+#Slping the dataset to train and test 
+# Train of 80% and test of 20%
+
+train.set <- feature[1:800, ]
+train.label <- target[1:800, ]
+test.set <- feature[801:1000, ]
+test.label <- (target[801:1000,])
+
+```
+
+
+
+```{r}
+
+#Train the model 
+# Train model 
+#install.packages(class)
+library(class)
+
+neigh<- round(sqrt(nrow(numeric_df)))+1 
+
+model <- knn(train= train.set,test=test.set,cl= train.label,k=neigh)
+
+#testing model 
+bost <- table(model,test.label)
+#Checking for model accuracy 
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x)))) * 100}
+
+print(accuracy(bost))
+
+```
+
+KNN model has an accuracy of 96%
+
+
+### SVM
+
+```{r}
+#Split the data into training set 80% and testing set 20%
+
+#install.packages("caret")
+library(caret)
+library(lattice)
+library(ggplot2)
+
+intrain <- createDataPartition(y = numeric_df$Clicked.on.Ad, p= 0.8, list = FALSE)
+train <- numeric_df[intrain,]
+test<- numeric_df[-intrain,]
+
+# Check the dimensions of out training dataframe and testing dataframe
+dim(train)
+dim(test)
+```
+
+
+
+```{r}
+#Train our model 
+#install.packages('e1071', dependencies=TRUE)
+library(e1071)
+trctrl <- trainControl(method = "repeatedcv", number = 10, repeats = 3)
+svm_Linear <- train(Clicked.on.Ad ~., data = train, method = "svmLinear",
+trControl=trctrl,
+preProcess = c("center", "scale"),
+tuneLength = 10)
+```
+```{r}
+#Check the result of our trained model 
+svm_Linear
+```
+
+```{r}
+#Predicting using trained data 
+pred <- predict(svm_Linear, newdata = test)
+```
+
+```{r}
+#Evaluating the model performance
+
+table(table(pred))
+table(test$Clicked.on.Ad)
+
+```
+
+```{r}
+accuracy <- function(x){sum(diag(x)/(sum(rowSums(x))))*100}
+smv <- table(pred,test$Clicked.on.Ad)
+print(accuracy(smv))
+```
+
+### Naive Bayes
+
+```{r}
+#Split Data to train and test (80% - 20%  respectively)
+
+intrain <- createDataPartition(y = numeric_df$Clicked.on.Ad, p= 0.8, list = FALSE)
+
+training <- numeric_df[intrain,]
+test<- numeric_df[-intrain,]
+```
+
+
+```{r}
+## Load the naivebayes package
+library(naivebayes)
+# Build prediction model
+nbmodel <- naive_bayes(as.character(Clicked.on.Ad)~ .,data = training)
+
+```
+
+```{r}
+# Predicting our testing set
+Pred <- predict(nbmodel,newdata = test)
+```
+
+```{r}
+#Evaluating model 
+cm<- table(table(pred, test$Clicked.on.Ad))
+
+cm
+```
+
+
+## Conclusion 
+ * People who are more likely to click on the ads are between the age of 19 
+  and 40.
+ * Females are more likely to click on ads
+ * People who spend more time using internet are more likely to click on ads.
+
+
+## Recommendations 
+cryptograph :
+
+ * Should target people between the age of 19 and 40 for their ad campaign.
+ * Should target females more than males during the campaign.
+ * Should target people who spend more time using the internet.
+
+
